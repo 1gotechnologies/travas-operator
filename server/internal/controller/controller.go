@@ -176,6 +176,14 @@ func (op *Operator) ProcessLogin() gin.HandlerFunc {
 					_ = ctx.AbortWithError(http.StatusInternalServerError, fmt.Errorf("token no generated : %v ", err))
 				}
 
+				cookieData.Set("token", t1)
+
+				if err := cookieData.Save(); err != nil {
+					log.Println("error from the session storage")
+					_ = ctx.AbortWithError(http.StatusNotFound, gin.Error{Err: err})
+					return
+				}
+
 				// var tk map[string]string
 				tk := map[string]string{"t1": t1, "t2": t2}
 
@@ -187,7 +195,6 @@ func (op *Operator) ProcessLogin() gin.HandlerFunc {
 					return
 				}
 
-				ctx.SetCookie("authorization", t1, 60*60*24*7, "/", "localhost", false, true)
 				ctx.JSON(http.StatusOK, gin.H{
 					"message":       "Welcome to user homepage",
 					"email":         email,
@@ -213,8 +220,18 @@ func (op *Operator) VerifyDocument() gin.HandlerFunc {
 	}
 }
 
+// Dashboard : this will help load up and process all the user details,information and all the
+// necessary data need in the user menu
+func (op *Operator) Dashboard() gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+
+		ctx.JSONP(http.StatusOK, gin.H{})
+	}
+}
+
 func (op *Operator) TourPackagePage() gin.HandlerFunc {
 	return func(ctx *gin.Context) {
+
 		ctx.JSONP(http.StatusOK, gin.H{})
 	}
 }
@@ -233,19 +250,19 @@ func (op *Operator) ProcessTourPackage() gin.HandlerFunc {
 
 		imgMap := make(map[string]any)
 
+		ctx.Writer.Header().Set("Content-Type", "multipart/form-data")
 		multiForm, err := ctx.MultipartForm()
 		if err != nil {
-			ctx.AbortWithError(http.StatusInternalServerError, err)
+			_ = ctx.AbortWithError(http.StatusInternalServerError, err)
 		}
 
 		imgForm, ok := multiForm.File["tour_images"]
 		if !ok {
-			ctx.AbortWithError(http.StatusInternalServerError, errors.New("cannot upload images"))
+			_ = ctx.AbortWithError(http.StatusInternalServerError, errors.New("cannot upload images"))
 			ctx.JSON(http.StatusInternalServerError, "error while uploading images")
 			return
 		}
 		for i, file := range imgForm {
-			log.Println(file.Filename)
 			x := fmt.Sprintf("image_%v", i)
 			imgMap[x] = file
 			if i > 5 {
@@ -311,10 +328,13 @@ func (op *Operator) ProcessTourPackage() gin.HandlerFunc {
 			return
 		}
 
-		ctx.JSON(http.StatusCreated, gin.H{"Message": "New package added successfully"})
+		ctx.JSON(http.StatusCreated, gin.H{
+			"message": "New package added successfully",
+		})
 	}
 }
 
+// PreviewTour : this handler will handle the request to preview tour package that is recently created
 func (op *Operator) PreviewTour() gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		cookieData := sessions.Default(ctx)
