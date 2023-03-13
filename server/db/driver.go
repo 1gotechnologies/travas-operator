@@ -2,7 +2,6 @@ package db
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"os"
 	"time"
@@ -36,7 +35,6 @@ func SetConnection(uri string) (*mongo.Client, error) {
 
 func OpenConnection() *mongo.Client {
 	uri := os.Getenv("TRAVAS_DB_URI")
-	fmt.Println(uri)
 
 	count := 0
 	for {

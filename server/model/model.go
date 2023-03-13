@@ -23,10 +23,12 @@ type Operator struct {
 }
 
 type TourGuide struct {
-	OperatorID primitive.ObjectID `bson:"operator_id" json:"operator_id,omitempty"`
-	ID         string             `bson:"_id" json:"_id"`
-	Name       string             `bson:"name" json:"name"`
-	Bio        string             `bson:"bio" json:"bio"`
+	OperatorID   primitive.ObjectID `bson:"operator_id" json:"operator_id,omitempty"`
+	ID           string             `bson:"_id" json:"_id"`
+	Name         string             `bson:"full_name" json:"full_name"`
+	Bio          string             `bson:"bio" json:"bio"`
+	ProfileImage map[string]any     `bson:"profile_image" json:"profile_image"`
+	IDCard       map[string]any     `bson:"id_card" json:"_id_card"`
 }
 
 type Tour struct {
@@ -41,7 +43,8 @@ type Tour struct {
 	Price           string             `bson:"price" json:"price"`
 	Contact         string             `bson:"contact" json:"contact,omitempty"`
 	Language        string             `bson:"language" json:"language,omitempty"`
-	Image           map[string]any     `bson:"tour_images" json:"tour_images"`
+	Image           map[string][]any   `bson:"tour_image" json:"tour_image"`
+	ImageStream     map[string][]any   `bson:"image_stream" json:"image_stream"`
 	NumberOfTourist string             `bson:"number_of_tourist" json:"number_of_tourist,omitempty"`
 	Description     string             `bson:"description" json:"description,omitempty"`
 	WhatToExpect    map[string]string  `bson:"what_to_expect" json:"what_to_expect"`

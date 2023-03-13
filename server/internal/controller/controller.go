@@ -6,7 +6,6 @@ import (
 	"log"
 	"net/http"
 	"regexp"
-	"strings"
 	"time"
 
 	"github.com/gin-contrib/sessions"
@@ -21,10 +20,12 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
+// Operator : It holds all the neccessary field n
 type Operator struct {
 	App *config.Tools
 	DB  query.Repo
 }
+
 
 func NewOperator(app *config.Tools, db *mongo.Client) *Operator {
 	return &Operator{
@@ -48,8 +49,7 @@ func (op *Operator) Register() gin.HandlerFunc {
 	}
 }
 
-// ProcessRegister : As the name implies , this method will help to process all the registration process
-// of the user
+// ProcessRegister : this helps to process user registration
 func (op *Operator) ProcessRegister() gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		if err := ctx.Request.ParseForm(); err != nil {
@@ -127,9 +127,11 @@ func (op *Operator) ProcessLogin() gin.HandlerFunc {
 		if err := ctx.Request.ParseForm(); err != nil {
 			_ = ctx.AbortWithError(http.StatusBadRequest, gin.Error{Err: err})
 		}
+		// get user inputs
 		email := ctx.Request.Form.Get("email")
 		password := ctx.Request.Form.Get("password")
 
+		// validate email using regex expression
 		regMail := regexp.MustCompile("^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$")
 		ok := regMail.MatchString(email)
 
@@ -165,11 +167,6 @@ func (op *Operator) ProcessLogin() gin.HandlerFunc {
 				}
 				cookieData.Set("info", userInfo)
 
-				if err := cookieData.Save(); err != nil {
-					log.Println("error from the session storage")
-					_ = ctx.AbortWithError(http.StatusNotFound, gin.Error{Err: err})
-					return
-				}
 				// generate the jwt token
 				t1, t2, err := token.Generate(email, id)
 				if err != nil {
@@ -224,132 +221,10 @@ func (op *Operator) VerifyDocument() gin.HandlerFunc {
 // necessary data need in the user menu
 func (op *Operator) Dashboard() gin.HandlerFunc {
 	return func(ctx *gin.Context) {
-
 		ctx.JSONP(http.StatusOK, gin.H{})
 	}
 }
 
-func (op *Operator) TourPackagePage() gin.HandlerFunc {
-	return func(ctx *gin.Context) {
-
-		ctx.JSONP(http.StatusOK, gin.H{})
-	}
-}
-
-func (op *Operator) ProcessTourPackage() gin.HandlerFunc {
-	return func(ctx *gin.Context) {
-		if err := ctx.Request.ParseForm(); err != nil {
-			_ = ctx.AbortWithError(http.StatusBadRequest, gin.Error{Err: err})
-		}
-
-		cookieData := sessions.Default(ctx)
-		userInfo := cookieData.Get("info").(model.UserInfo)
-
-		CreatedAt, _ := time.Parse(time.RFC3339, time.Now().Format(time.RFC3339))
-		UpdatedAt, _ := time.Parse(time.RFC3339, time.Now().Format(time.RFC3339))
-
-		imgMap := make(map[string]any)
-
-		ctx.Writer.Header().Set("Content-Type", "multipart/form-data")
-		multiForm, err := ctx.MultipartForm()
-		if err != nil {
-			_ = ctx.AbortWithError(http.StatusInternalServerError, err)
-		}
-
-		imgForm, ok := multiForm.File["tour_images"]
-		if !ok {
-			_ = ctx.AbortWithError(http.StatusInternalServerError, errors.New("cannot upload images"))
-			ctx.JSON(http.StatusInternalServerError, "error while uploading images")
-			return
-		}
-		for i, file := range imgForm {
-			x := fmt.Sprintf("image_%v", i)
-			imgMap[x] = file
-			if i > 5 {
-				break
-			}
-		}
-
-		wte := []string{ctx.Request.FormValue("what_to_expect")}
-		whatToExpect := make(map[string]string)
-		for x, y := range wte {
-			key := fmt.Sprintf("what_to_expect_%v", x)
-			whatToExpect[key] = y
-
-		}
-
-		rules := []string{ctx.Request.FormValue("rules")}
-		rulesMap := make(map[string]string)
-		for x, y := range rules {
-			key := fmt.Sprintf("rule_%v", x)
-			rulesMap[key] = y
-		}
-
-		tour := &model.Tour{
-			ID:              primitive.NewObjectID(),
-			OperatorID:      userInfo.ID,
-			Title:           ctx.Request.FormValue("title"),
-			Destination:     strings.TrimSpace(strings.ToLower(ctx.Request.FormValue("destination"))),
-			MeetingPoint:    ctx.Request.FormValue("meeting_point"),
-			StartTime:       ctx.Request.FormValue("start_time"),
-			StartDate:       ctx.Request.FormValue("start_date"),
-			EndDate:         ctx.Request.FormValue("end_date"),
-			Price:           ctx.Request.FormValue("price"),
-			Image:           imgMap,
-			Contact:         ctx.Request.FormValue("contact"),
-			Language:        ctx.Request.FormValue("language"),
-			NumberOfTourist: ctx.Request.FormValue("number_of_tourists"),
-			Description:     ctx.Request.FormValue("description"),
-			WhatToExpect:    whatToExpect,
-			Rules:           rulesMap,
-			CreatedAt:       CreatedAt,
-			UpdatedAt:       UpdatedAt,
-		}
-
-		if err := op.App.Validator.Struct(&tour); err != nil {
-			if _, ok := err.(*validator.InvalidValidationError); !ok {
-				_ = ctx.AbortWithError(http.StatusBadRequest, gin.Error{Err: err})
-				log.Println(err)
-				return
-			}
-		}
-
-		cookieData.Set("tour_id", tour.ID)
-
-		if err := cookieData.Save(); err != nil {
-			log.Println("error from the session storage")
-			_ = ctx.AbortWithError(http.StatusNotFound, gin.Error{Err: err})
-			return
-		}
-
-		_, err = op.DB.InsertPackage(tour)
-		if err != nil {
-			_ = ctx.AbortWithError(http.StatusBadRequest, gin.Error{Err: err})
-			return
-		}
-
-		ctx.JSON(http.StatusCreated, gin.H{
-			"message": "New package added successfully",
-		})
-	}
-}
-
-// PreviewTour : this handler will handle the request to preview tour package that is recently created
-func (op *Operator) PreviewTour() gin.HandlerFunc {
-	return func(ctx *gin.Context) {
-		cookieData := sessions.Default(ctx)
-		tourID, ok := cookieData.Get("tour_id").(primitive.ObjectID)
-		if !ok {
-			_ = ctx.AbortWithError(http.StatusNotFound, errors.New("cannot find tour id"))
-		}
-		tour, err := op.DB.LoadTour(tourID)
-		if err != nil {
-			_ = ctx.AbortWithError(http.StatusInternalServerError, gin.Error{Err: err})
-			return
-		}
-		ctx.JSONP(http.StatusOK, gin.H{"tour": tour})
-	}
-}
 
 func (op *Operator) GetTourRequest() gin.HandlerFunc {
 	return func(ctx *gin.Context) {

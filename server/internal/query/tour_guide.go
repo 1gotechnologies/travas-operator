@@ -11,6 +11,11 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
+// INFO --> these methods are only meant to interact with the tour guide collection
+//      --> in the database and other tour guide related queries
+
+
+// InsertTourGuide : this will allow the operator to add new tour guide
 func (op *OperatorDB) InsertTourGuide(tg *model.TourGuide) (bool, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Second)
 	defer cancel()
@@ -31,6 +36,9 @@ func (op *OperatorDB) InsertTourGuide(tg *model.TourGuide) (bool, error) {
 	}
 	return true, nil
 }
+
+// FindTourGuide : this will help get all the register tour guide and made available for 
+// selection
 func (op *OperatorDB) FindTourGuide(operatorID primitive.ObjectID) ([]primitive.M, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Second)
 	defer cancel()
@@ -56,14 +64,18 @@ func (op *OperatorDB) FindTourGuide(operatorID primitive.ObjectID) ([]primitive.
 	return res, nil
 }
 
+// UpdateTourGuide : allow any form of update for the tour guide 
 func (op *OperatorDB) UpdateTourGuide(guideID string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Second)
 	defer cancel()
+	opt := options.Delete().SetCollation(&options.Collation{
+		Locale:    "en_US",
+		Strength:  1,
+		CaseLevel: false,
+	})
 	filter := bson.D{{Key: "_id", Value: guideID}}
-	update := bson.D{{Key: "$pull", Value: bson.D{{Key: "_id", Value: guideID}}}}
-	opt := options.Update().SetUpsert(false)
 
-	_, err := TourGuideData(op.DB, "tour_guide").UpdateOne(ctx, filter, update, opt)
+	_, err := TourGuideData(op.DB, "tour_guide").DeleteOne(ctx, filter,opt)
 	if err != nil {
 		op.App.ErrorLogger.Fatal(err)
 	}

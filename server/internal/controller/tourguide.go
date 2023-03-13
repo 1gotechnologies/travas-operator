@@ -5,6 +5,7 @@ import (
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
 	"github.com/travas-io/travas-op/model"
+	"github.com/travas-io/travas-op/pkg/upload"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"net/http"
 	"strings"
@@ -12,7 +13,7 @@ import (
 
 func (op *Operator) AddTourGuide() gin.HandlerFunc {
 	return func(ctx *gin.Context) {
-		if err := ctx.Request.ParseForm(); err != nil {
+		if err := ctx.Request.ParseMultipartForm(int64(MEMORYMAXSIZE)); err != nil {
 			_ = ctx.AbortWithError(http.StatusBadRequest, gin.Error{Err: err})
 		}
 
@@ -23,18 +24,27 @@ func (op *Operator) AddTourGuide() gin.HandlerFunc {
 			_ = ctx.AbortWithError(http.StatusNotFound, errors.New("cannot find operator id"))
 		}
 
-		tourGuide := &model.TourGuide{
-			OperatorID: userInfo.ID,
-			ID:         primitive.NewObjectID().Hex(),
-			Name:       ctx.Request.Form.Get("guide_name"),
-			Bio:        ctx.Request.Form.Get("bio"),
+		form := ctx.Request.MultipartForm
+
+		imageInfo, err := upload.SingleFile(form, "profile_image")
+		if err != nil {
+			_ = ctx.AbortWithError(http.StatusBadRequest, gin.Error{Err: err})
 		}
 
-		ok, err := op.DB.InsertTourGuide(tourGuide)
+		tourGuide := &model.TourGuide{
+			OperatorID:   userInfo.ID,
+			ID:           primitive.NewObjectID().Hex(),
+			Name:         ctx.Request.Form.Get("full_name"),
+			Bio:          ctx.Request.Form.Get("bio"),
+			ProfileImage: imageInfo,
+		}
+
+		ok, err = op.DB.InsertTourGuide(tourGuide)
 		if !ok {
 			_ = ctx.AbortWithError(http.StatusInternalServerError, gin.Error{Err: err})
 		}
-		ctx.JSONP(http.StatusOK, gin.H{"message": "New tour guide added"})
+
+		ctx.JSONP(http.StatusOK, gin.H{"message": "tour guide added"})
 	}
 }
 
@@ -65,10 +75,9 @@ func (op *Operator) DeleteTourGuide() gin.HandlerFunc {
 		if err != nil {
 			_ = ctx.AbortWithError(http.StatusInternalServerError, gin.Error{Err: err})
 			return
-
 		}
-		ctx.JSONP(http.StatusOK, gin.H{"message": "successfully remove tour guide"})
-
+		
+		ctx.JSONP(http.StatusOK, gin.H{"message": "tour guide delete successfully"})
 	}
 }
 
